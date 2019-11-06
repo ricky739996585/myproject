@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html style="font-size: 54.8px;">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <title>签到</title>
+    <script type="text/javascript" src="js/jquery-1.10.2.js"></script>
+    <script type="text/javascript" src="js/jQueryRotate.js"></script>
+    <style>
+        /*抽奖大转盘开始*/
+        .ck-wheel {
+            width: 100%;
+            height: 6.64rem;
+            background: url("img/balloon@2x.png") no-repeat left top;
+            background-size: 7.5rem 5.68rem;
+            margin: .3rem 0;
+        }
+
+        .wheel {
+            display: block;
+            width: 6.64rem;
+            height: 6.64rem;
+            position: relative;
+            background-image: url("img/wheel-bg.png");
+            background-size: 100% 100%;
+            margin: 0 auto;
+        }
+
+        img.pointer {
+            position: absolute;
+            width: 3rem;
+            height: 3.3rem;
+            left: 1.82rem;
+            top: 1.67rem;
+        }
+
+        #wheelCanvas {
+            width: 6.64rem;
+            height: 6.64rem;
+        }
+
+        /*抽奖大转盘结束*/
+    </style>
+</head>
+<body>
+<#--抽奖专区-->
+<div class="ck-wheel">
+    <div class="wheel">
+        <canvas class="item" id="wheelCanvas" width="844px" height="844px"></canvas>
+        <img class="pointer" src="img/wheel-pointer.png"/>
+    </div>
+</div>
+
+
+<script>
+    var rewardList = [];
+    var imgList = [];
+    //抽奖转盘
+    var turnWheel = {
+        rewardNames: [], //转盘奖品名称数组
+        rewardUrl: [], //转盘奖品图片
+        colors: [], //转盘奖品区块对应背景颜色
+        outsideRadius: 340, //转盘外圆的半径
+        textRadius: 320, //转盘奖品位置距离圆心的距离
+        insideRadius: 68, //转盘内圆的半径
+        startAngle: 0, //开始角度
+        bRotate: false //false:停止;ture:旋转
+    };
+    // 图片信息
+
+    // var imgUrl1 = new Image();
+    // imgUrl1.width = 20;
+    // imgUrl1.height = 20;
+    // var imgUrl2 = new Image();
+    // var imgUrl3 = new Image();
+    // var imgUrl4 = new Image();
+    // var imgUrl5 = new Image();
+    // var imgUrl6 = new Image();
+    $(function () {
+        $.ajax({
+            type: "GET",
+            url: "http://localhost:8888/reward/api/getRewardList",
+            dataType: "json", // 返回数据类型
+            success: function (res) {
+                rewardList = res.data;
+                initWheel(rewardList);
+            },
+            error: function () {
+                console.log("网络错误，请检查您的网络设置！");
+            }
+        });
+    });
+
+    function initWheel(list) {
+        console.log("开始初始化")
+        //把数据放入数组中
+        for (var i = 0; i < list.length; i++) {
+            turnWheel.rewardNames[i] = list[i].name;
+            turnWheel.rewardUrl[i] = list[i].icon;
+        }
+
+        // turnWheel.rewardNames = ["380元白酒抵用券", "谢谢参与", "30积分", "谢谢参与", "10积分", "谢谢参与"];
+        // //6个图片地址,需要自己写一下
+        // turnWheel.rewardUrl = [];
+        turnWheel.colors = [
+            "#AE3EFF",
+            "#4D3FFF",
+            "#FC262C",
+            "#3A8BFF",
+            "#EE7602",
+            "#FE339F"
+        ];
+        //
+        //
+        // imgUrl1.src = turnWheel.rewardUrl[0];
+        // imgUrl2.src = turnWheel.rewardUrl[1];
+        // imgUrl3.src = turnWheel.rewardUrl[2];
+        // imgUrl4.src = turnWheel.rewardUrl[3];
+        // imgUrl5.src = turnWheel.rewardUrl[4];
+        // imgUrl6.src = turnWheel.rewardUrl[5];
+        //图片预加载，再进行画图
+        loadImgAndDrawCanvas(turnWheel.rewardUrl);
+
+
+    }
+
+    // 预处理图片
+    function loadImgAndDrawCanvas(source) {
+        let pr = [];
+        for(let i = 0;i<source.length;i++){
+            // 预加载图片
+            let p = loadImage(source[i])
+                .then(img => this.imgList[i] = img)
+                .catch(err => console.log(err))
+            pr.push(p);
+        }
+
+        // 图片全部加载完,然后再画图
+        Promise.all(pr)
+            .then(() => {
+                drawWheelCanvas();
+            });
+
+    }
+
+    // 预加载图片
+    function loadImage(url) {
+        return new Promise((resolve, reject) => {
+            let img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = url;
+        })
+    }
+
+
+    //旋转转盘 item:奖品序号，从0开始的; txt：提示语 ,count 奖品的总数量;
+    var rotateFunc = function (item, tip, count) {
+
+        // 应该旋转的角度，旋转插件角度参数是角度制。
+        var baseAngle = 360 / count;
+        // 旋转角度 == 270°（当前第一个角度和指针位置的偏移量） - 奖品的位置 * 每块所占的角度 - 每块所占的角度的一半(指针指向区域的中间)
+        angles = 360 * 3 / 4 - (item * baseAngle) - baseAngle / 2; // 因为第一个奖品是从0°开始的，即水平向右方向
+        $('#wheelCanvas').stopRotate();
+        // 注意，jqueryrotate 插件传递的角度不是弧度制。
+        // 哪个标签调用方法，旋转哪个控件
+        $('#wheelCanvas').rotate({
+            angle: 0,
+            animateTo: angles + 360 * 5, // 这里多旋转了5圈，圈数越多，转的越快
+            duration: 8000,
+            callback: function () { // 回调方法
+                alert(tip);
+                turnWheel.bRotate = !turnWheel.bRotate;
+
+            }
+        });
+    };
+    // 抽取按钮按钮点击触发事件
+    $('.pointer').click(function () {
+        // 正在转动，直接返回
+        if (turnWheel.bRotate) return;
+        turnWheel.bRotate = !turnWheel.bRotate;
+        var count = turnWheel.rewardNames.length;
+        // rotateFunc(0, turnWheel.rewardNames[0], count);
+
+        // 这里应该是从服务器获取用户真实的获奖信息（对应的获奖序号）
+        $.ajax({
+            type: "GET",
+            url: "http://localhost:8888/reward/api/lottery",
+            dataType: "json", // 返回数据类型
+            success: function (res) {
+                var reward = res.msg;
+                turnWheel.rewardNames.forEach(function (currentValue, index) {
+                    if (currentValue == reward) {
+                        var item = index;
+                        $(".award-warp .content").html(reward);
+                        // 开始抽奖
+                        rotateFunc(item, turnWheel.rewardNames[item], count);
+                    }
+                })
+            },
+            error: function () {
+                console.log("网络错误，请检查您的网络设置！");
+            }
+        });
+
+    });
+
+    function drawWheelCanvas() {
+        console.log("开始画图")
+        var canvas = document.getElementById("wheelCanvas");
+        var baseAngle = Math.PI * 2 / (turnWheel.rewardNames.length);
+        var ctx = canvas.getContext("2d");
+        var canvasW = canvas.width; // 画板的高度
+        var canvasH = canvas.height; // 画板的宽度
+        ctx.fillStyle = "#fff000";
+        ctx.clearRect(0, 0, canvasW, canvasH);//去掉背景默认的黑色
+        ctx.strokeStyle = "#199301"; //线的颜色
+        ctx.font = '26px Microsoft YaHei';
+        //ctx.closePath();
+        //使用了beginPath(),canvas会知道是重新画一条，如果给这几条设置不同的属性也是可以的。
+        for (var index = 0; index < turnWheel.rewardNames.length; index++) {
+            var angle = turnWheel.startAngle + index * baseAngle;
+            ctx.fillStyle = turnWheel.colors[index];
+            ctx.beginPath();
+            ctx.arc(canvasW * 0.5, canvasH * 0.5, turnWheel.outsideRadius, angle, angle + baseAngle, false);
+            ctx.arc(canvasW * 0.5, canvasH * 0.5, turnWheel.insideRadius, angle + baseAngle, angle, true);
+            ctx.stroke();
+            ctx.fill();
+            ctx.save();
+            ctx.fillStyle = "#FFFF00";
+            var rewardName = turnWheel.rewardNames[index];
+            var line_height = 24;
+            var translateX = canvasW * 0.5 + Math.cos(angle + baseAngle / 2) * turnWheel.textRadius;
+            var translateY = canvasH * 0.5 + Math.sin(angle + baseAngle / 2) * turnWheel.textRadius;
+            ctx.translate(translateX, translateY);
+            ctx.rotate(angle + baseAngle / 2 + Math.PI / 2);
+            //ctx.drawImage(imgUrl1, -15, 10);
+            ctx.fillText(rewardName, -ctx.measureText(rewardName).width / 2, 100);
+            //添加对应图标
+            ctx.drawImage(imgList[index], -35, 0, 60, 60);
+            ctx.restore(); //很关键
+        }
+    }
+
+</script>
+</body>
+</html>

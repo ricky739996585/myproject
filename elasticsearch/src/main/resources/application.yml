@@ -1,0 +1,7 @@
+# elasticsearch
+elasticSearch:
+  host: 10.0.98.153
+  port: 9200
+  client:
+    connectNum: 10
+    connectPerRoute: 50
