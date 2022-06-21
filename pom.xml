@@ -27,7 +27,7 @@
         <mybatisplus.spring.boot.version>1.0.5</mybatisplus.spring.boot.version>
         <fastjson.version>1.2.56</fastjson.version>
         <druid.version>1.0.28</druid.version>
-        <mysql.version>5.1.38</mysql.version>
+        <mysql.version>8.0.28</mysql.version>
     </properties>
 
     <dependencies>
